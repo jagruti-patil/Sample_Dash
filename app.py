@@ -9,6 +9,10 @@ from datetime import timedelta
 import pandas_datareader as web
 import re
 import dash_table.DataTable
+from google.cloud import bigquery
+import plotly.express as px
+from google.oauth2 import service_account
+
 
 #################################### Dataframe Configuration for displaying pandas Dataframe
 desired_width = 520
@@ -19,12 +23,49 @@ pd.set_option('display.max_columns', 25)
 app = dash.Dash(__name__) # , external_stylesheets=external_stylesheets)
 
 #--------------------------------------------------------------- 1.)        RETRIEVE DATA
-df = pd.read_excel("C:\\Users\\piyus\\PycharmProjects\\sample_dash\\omg_charges_and_payments.xlsx")
-print(df)
-df['charge_date'] = pd.to_datetime(df['charge_date'], format='%Y-%b-%dT%H:%M:%S')
-df['charge_date'] =  pd.to_datetime(df['charge_date'], format='%Y-%b-%dT%H:%M:%S')
-df['date_of_responsibility'] =  pd.to_datetime(df['date_of_responsibility'], format='%Y-%b-%dT%H:%M:%S')
+# df = pd.read_excel("E:\Git2019\DASH_RND\Sample_Dash\omg_charges_and_payments.xlsx")
+# print(df)
+# df['charge_date'] = pd.to_datetime(df['charge_date'], format='%Y-%b-%dT%H:%M:%S')
+# df['charge_date'] =  pd.to_datetime(df['charge_date'], format='%Y-%b-%dT%H:%M:%S')
+# df['date_of_responsibility'] =  pd.to_datetime(df['date_of_responsibility'], format='%Y-%b-%dT%H:%M:%S')
+# dff = df.groupby(['facility', 'provider', 'cpt_group', 'cpt','charge_date'], as_index=False)[['charges', 'payments', 'total_outstanding']].sum()
+
+#########################################################   Configuring Big Query Client for Dash
+def configpath():
+    try:
+        project_id = 'qinsights'
+        client = bigquery.Client(project=project_id)
+    except:
+        client = None
+    return client
+
+######################################################### Retrieving Data from Big Query
+client = configpath()
+if client is None:
+    print("Credentials is not found ")
+else:
+    try :
+        # query = """
+        #         select * from ma_test.Dash_test_table"""
+
+        query = """ call ma_test.dash_sp() """
+        job_config = bigquery.QueryJobConfig()
+        job_config.use_query_cache = True
+        query_job = client.query(query, location="US", job_config=job_config)
+        df = query_job.to_dataframe()
+        print(
+            "####################################################Processed Datafrane###################################################")
+        print(df)
+        print(
+            "##########################################################################################################################")
+    except Exception as e :
+        print(str(e))
+
+df['charge_date'] = pd.to_datetime(df['charge_date'], format='%Y-%m-%d')
+df['charge_date'] =  pd.to_datetime(df['charge_date'], format='%Y-%m-%d')
+df['date_of_responsibility'] =  pd.to_datetime(df['date_of_responsibility'], format='%Y-%m-%d')
 dff = df.groupby(['facility', 'provider', 'cpt_group', 'cpt','charge_date'], as_index=False)[['charges', 'payments', 'total_outstanding']].sum()
+
 #--------------------------------------------------------------- 2.)        BUILD LAYOUT
 
 
@@ -35,58 +76,17 @@ app.layout = html.Div([
         #     className='one-third column'
         # ),
         html.Div(
-            html.H3('QInsights Analytics', style={'text-align': 'center', 'font-family': 'Georgia, serif'}),
+            html.H3('Financial Productivity Dashboard', style={'text-align': 'center', 'font-family': 'Arial, Helvetica, sans-serif , serif'}),
             className='two-thirds columns'
         ),
             ], className='row'),
 
     # dcc.Tabs(id='dashboard-tabs', value='tab-1', children=[
-    #     dcc.Tab(label='Revenue Cycle Management', value='RCM',style={'font-size':'20px','font-family': 'Georgia, serif','text-align':'center'}),
-    #     dcc.Tab(label='Accounts Receivable', value='AR',style={'font-size':'20px','font-family': 'Georgia, serif','text-align':'center'}),
-    #     dcc.Tab(label='Rejections Analysis', value='REJ',style={'font-size':'20px','font-family': 'Georgia, serif','text-align':'center'}),
+    #     dcc.Tab(label='Revenue Cycle Management', value='RCM',style={'font-size':'20px','font-family': 'Arial, Helvetica, sans-serif, serif','text-align':'center'}),
+    #     dcc.Tab(label='Accounts Receivable', value='AR',style={'font-size':'20px','font-family': 'Arial, Helvetica, sans-serif, serif','text-align':'center'}),
+    #     dcc.Tab(label='Rejections Analysis', value='REJ',style={'font-size':'20px','font-family': 'Arial, Helvetica, sans-serif, serif','text-align':'center'}),
     # ]),
     html.Div(id='tabs-example-content'),
-    html.Div([
-        html.Div([
-        html.P('Group By :',style={'font-size':'14px','font-family': 'Georgia, serif','text-align':'center'}),
-        dcc.Dropdown(id='metricdropdown',
-                options=[
-                         {'label': 'Facility', 'value': 'facility'},
-                         {'label': 'provider', 'value': 'provider'},
-                         {'label': 'cpt_group', 'value': 'cpt_group'}
-                ],
-            value='charges',
-            multi=False,
-            clearable=False,
-            style={'font-family': 'Georgia, serif','margin':'5px'}
-        ),
-        ], className='four columns'),
-        # html.Div([
-        #     html.P('Select a facility:',style={'font-size':'14px','font-family': 'Georgia, serif','text-align':'center'}),
-        #     dcc.Dropdown(id='facilitydropdown',
-        #         options=[{'label':i, 'value':i} for i in dff.facility.unique()],
-        #         placeholder='Select a facility...',
-        #         value='TRIATRIA',
-        #         multi=True,
-        #         clearable=False,
-        #         searchable=True,
-        #         style={'font-family': 'Georgia, serif','margin':'5px'}
-        #     ),
-        # ], className='four columns'),
-        #
-        # html.Div([
-        #     html.P('Select a provider:',style={'font-size':'14px','font-family': 'Georgia, serif','text-align':'center'}),
-        #     dcc.Dropdown(id='providerdropdown',
-        #         options=[{'label':i, 'value':i} for i in dff.provider.unique()],
-        #         placeholder='Select a provider...',
-        #         value='JEFFREY MARGOLIS',
-        #         multi=True,
-        #         clearable=False,
-        #         searchable=True,
-        #         style={'font-family': 'Georgia, serif','margin':'5px'}
-        #     ),
-        # ],className='four columns'),
-    ],className='row'),
 
     html.Div([
         html.Div([
@@ -100,22 +100,64 @@ app.layout = html.Div([
                 end_date=dt(2020,6,10)
             )
             ],
-        className='row',style={'text-align':'center','align':'center','font-family': 'Georgia, serif'}),
+        className='row',style={'text-align':'center','align':'center','font-family': 'Arial, Helvetica, sans-serif, serif'}),
         # html.Div([
         #     dcc.Graph(id='barchart'),
-        # ], className='four columns',style={'font-family': 'Georgia, serif','margin':'0px'}),
+        # ], className='four columns',style={'font-family': 'Arial, Helvetica, sans-serif, serif','margin':'0px'}),
         #
         # html.Div([
         #     dcc.Graph(id='linechart'),
-        # ], className='four columns',style={'font-family': 'Georgia, serif','margin':'0px'}),
+        # ], className='four columns',style={'font-family': 'Arial, Helvetica, sans-serif, serif','margin':'0px'}),
         #
         # html.Div([
         #     dcc.Graph(id='piechart'),
-        # ],className='four columns',style={'font-family': 'Georgia, serif','margin':'0px'}),
+        # ],className='four columns',style={'font-family': 'Arial, Helvetica, sans-serif, serif','margin':'0px'}),
     ], className='row',style={'margin':'0px'}),
 
     html.Div([
-        html.H3(id='output-total',children='',style={'text-align':'center','font-family': 'Georgia, serif'})
+            html.Div([
+            html.P('Group By :',style={'font-size':'14px','font-family': 'Arial, Helvetica, sans-serif, serif','text-align':'center'}),
+            dcc.Dropdown(id='metricdropdown',
+                    options=[
+                             {'label': 'Facility', 'value': 'facility'},
+                             {'label': 'provider', 'value': 'provider'},
+                             {'label': 'cpt_group', 'value': 'cpt_group'}
+                    ],
+                value='charges',
+                multi=False,
+                clearable=False,
+                style={'font-family': 'Arial, Helvetica, sans-serif, serif','margin':'5px'}
+            ),
+            ], className='four columns'),
+            # html.Div([
+            #     html.P('Select a facility:',style={'font-size':'14px','font-family': 'Arial, Helvetica, sans-serif, serif','text-align':'center'}),
+            #     dcc.Dropdown(id='facilitydropdown',
+            #         options=[{'label':i, 'value':i} for i in dff.facility.unique()],
+            #         placeholder='Select a facility...',
+            #         value='TRIATRIA',
+            #         multi=True,
+            #         clearable=False,
+            #         searchable=True,
+            #         style={'font-family': 'Arial, Helvetica, sans-serif, serif','margin':'5px'}
+            #     ),
+            # ], className='four columns'),
+            #
+            # html.Div([
+            #     html.P('Select a provider:',style={'font-size':'14px','font-family': 'Arial, Helvetica, sans-serif, serif','text-align':'center'}),
+            #     dcc.Dropdown(id='providerdropdown',
+            #         options=[{'label':i, 'value':i} for i in dff.provider.unique()],
+            #         placeholder='Select a provider...',
+            #         value='JEFFREY MARGOLIS',
+            #         multi=True,
+            #         clearable=False,
+            #         searchable=True,
+            #         style={'font-family': 'Arial, Helvetica, sans-serif, serif','margin':'5px'}
+            #     ),
+            # ],className='four columns'),
+        ],className='row'),
+
+    html.Div([
+        html.H3(id='output-total',children='',style={'text-align':'center','font-family': 'Arial, Helvetica, sans-serif, serif'})
     ]),
 
     html.Div([
@@ -137,7 +179,7 @@ app.layout = html.Div([
             page_size= 25,
             style_header={
                 'text-align':'center',
-                'backgroundColor': 'rgb(43, 40, 201)'
+                'backgroundColor': 'rgb(168, 195, 237)'
                 },
             style_cell={
                 'text-align': 'center',
@@ -146,18 +188,30 @@ app.layout = html.Div([
                 'color': 'black'
             }
         ),]
-        , className='row'),       
+        , className='row'),
+
+
+    # html.Div([
+    #     dcc.Graph(id='barchart'),
+    # ], className='four columns', style={'font-family': 'Georgia, serif', 'margin': '0px'})
 ])
+
+
+
 
 #------------------------------------------------------------------ 3.)     BUILD FUNCTIONALITY
 @app.callback(
-    [Output('output-total', 'children'),
+    [
+        # Output('barchart', 'figure'),
+     Output('output-total', 'children'),
      Output('datatable_id', 'data')],
     [Input('datatable_id', 'selected_rows'),
     Input('metricdropdown', 'value'),
      Input('my-date-picker-range', 'start_date'),
      Input('my-date-picker-range', 'end_date')]
 )
+
+
 def update_data(chosen_rows, metricdropval, start_date, end_date):
     
     if len(chosen_rows)==0:
@@ -193,7 +247,7 @@ def update_data(chosen_rows, metricdropval, start_date, end_date):
     # legend=dict(
     #         traceorder='normal',
     #         font=dict(
-    #             family='Georgia, serif',
+    #             family='Arial, Helvetica, sans-serif, serif',
     #             size=10,
     #             color='black'
     #         ),
@@ -237,27 +291,94 @@ def update_data(chosen_rows, metricdropval, start_date, end_date):
 
 
     if metricdropval == 'facility':
-        metric_total = 'Total Charges: ${:,.2f}'.format(df_filterd.charges.sum())
-        dff_facility = df.groupby(['facility', 'charge_date'], as_index=False)[['charges', 'payments', 'total_outstanding']].sum()
-        df_filterd = dff_facility[(dff_facility['charge_date'] >= start_date) & (dff_facility['charge_date'] <= end_date)]
+        # metric_total = 'Total Charges: ${:,.2f}'.format(df_filterd.charges.sum())
+        # dff_facility = df.groupby(['facility'], as_index=False)[['charges', 'payments', 'total_outstanding']].sum()
+        # df_filterd = dff_facility[(dff_facility['charge_date'] >= start_date) & (dff_facility['charge_date'] <= end_date)]
+
+
+        df_filterd = df[
+            (df['charge_date'] >= start_date) & (df['charge_date'] <= end_date)]
+        dff_facility = df_filterd.groupby(['facility'], as_index=False)[
+            ['charges', 'payments', 'total_outstanding']].sum()
+        # dbargraph = dff_facility
         print("#############################################################")
         print(dff_facility)
         print("#############################################################")
-        data_table_content = df_filterd.to_dict('records')
+        data_table_content = dff_facility.to_dict('records')
+        metric_total = 'Total Charges: ${:,.2f}'.format(df_filterd.charges.sum())
+        # dbargraph['aprovider'] = dbargraph['provider'].apply(lambda x: x[0] + '. ' + x.split(' ')[-1])
+        # bar_chart = px.bar(
+        #     data_frame=dbargraph,
+        #     x='facility',
+        #     y='aprovider',
+        #     orientation='h',
+        #     hover_data=['provider', 'facility'],
+        #     color='facility',
+        #     color_continuous_scale=px.colors.sequential.Emrld,
+        #     text='facility',
+        #     labels={'facility': 'facility', 'charges': 'Provider'}
+        # )
+        # bar_chart.update_layout(uirevision='foo', yaxis={'categoryorder': 'total ascending'}, showlegend=False)
+        # bar_chart.update_traces(texttemplate='%{text:$.2s}', textposition='outside')
+        # bar_chart.update_xaxes(range=[dbargraph['facility'].min(),
+        #                               dbargraph['facility'].max() + (dbargraph['facility'].max() * 0.25)])
+
+
+
+
     elif metricdropval == 'provider':
-        metric_total = 'Total Payments: ${:,.2f}'.format(df_filterd.payments.sum())
-        dff_provider = df.groupby(['provider', 'charge_date'], as_index=False)[['charges', 'payments', 'total_outstanding']].sum()
-        df_filterd = dff_provider[(dff_provider['charge_date'] >= start_date) & (dff_provider['charge_date'] <= end_date)]
+
+        # dff_provider = df.groupby(['provider', 'charge_date'], as_index=False)[['charges', 'payments', 'total_outstanding']].sum()
+        # df_filterd = dff_provider[(dff_provider['charge_date'] >= start_date) & (dff_provider['charge_date'] <= end_date)]
+
+        df_filterd = df[
+            (df['charge_date'] >= start_date) & (df['charge_date'] <= end_date)]
+        dff_provider = df_filterd.groupby(['provider'], as_index=False)[
+            ['charges', 'payments', 'total_outstanding']].sum()
+        # dbargraph = dff_provider
         data_table_content = dff_provider.to_dict('records')
+        metric_total = 'Total Payments: ${:,.2f}'.format(df_filterd.payments.sum())
     else:
+
+        # dff_cpt_group = df.groupby(['cpt_group', 'charge_date'], as_index=False)[['charges', 'payments', 'total_outstanding']].sum()
+        # df_filterd = dff_cpt_group[
+        #     (dff_cpt_group['charge_date'] >= start_date) & (dff_cpt_group['charge_date'] <= end_date)]
+
+        df_filterd = df[
+            (df['charge_date'] >= start_date) & (df['charge_date'] <= end_date)]
+        dff_cpt_group = df_filterd.groupby(['cpt_group'], as_index=False)[
+            ['charges', 'payments', 'total_outstanding']].sum()
+        # dbargraph = dff_cpt_group
+        data_table_content = dff_cpt_group.to_dict('records')
         metric_total = 'Total Outstanding: ${:,.2f}'.format(df_filterd.total_outstanding.sum())
-        dff_cpt_group = df.groupby(['cpt_group', 'charge_date'], as_index=False)[['charges', 'payments', 'total_outstanding']].sum()
-        df_filterd = dff_cpt_group[
-            (dff_cpt_group['charge_date'] >= start_date) & (dff_cpt_group['charge_date'] <= end_date)]
-        data_table_content = df_filterd.to_dict('records')
+
+    dbargraph = df_filterd.groupby(['provider'], as_index=False)[
+        ['charges', 'payments', 'total_outstanding']].sum()
+    dbargraph['aprovider'] = dbargraph['provider'].apply(lambda x: x[0] + '. ' + x.split(' ')[-1])
+
+    # # dbargraph['aprovider'] = dbargraph['provider'].apply(lambda x: x[0] + '. ' + x.split(' ')[-1])
+    # bar_chart = px.bar(
+    #     data_frame=dbargraph,
+    #     x=metricdropval,
+    #     y='aprovider',
+    #     hover_data=['provider', metricdropval],
+    #     color=metricdropval,
+    #     color_continuous_scale=px.colors.sequential.Emrld,
+    #     text=metricdropval,
+    #     labels={metricdropval: metricdropval, 'aprovider': 'Provider'}
+    # )
+    # # bar_chart.update_layout(uirevision='foo', yaxis={'categoryorder': 'total ascending'}, showlegend=False)
+    # # bar_chart.update_traces(texttemplate='%{text:$.2s}', textposition='outside')
+    # # bar_chart.update_xaxes(range=[dbargraph[metricdropval].min(),
+    # #                               dbargraph[metricdropval].max() + (dbargraph[metricdropval].max() * 0.25)])
+
+
+
 
     # return (pie_chart,bar_chart,metric_total)
     return (metric_total,data_table_content)
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True,port = 8070)
+
+
